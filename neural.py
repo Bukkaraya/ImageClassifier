@@ -16,9 +16,13 @@ def softmax_activation(Z):
 def softmax_backward(dA, cache):
     Z = cache
 
+    print('Z' + str(Z))
+    print('dA' + str(dA))
     shiftz = Z - np.max(Z, axis=0)
     softmax = np.exp(shiftz) / np.sum(np.exp(shiftz), axis=0)
     dZ = dA * softmax * (1 - softmax)
+
+    print('dZ' + str(dZ))
 
     assert dZ.shape == Z.shape
 
@@ -42,6 +46,7 @@ def relu_backward(dA, cache):
     Z = cache
     dZ = np.array(dA, copy=True)
     dZ[Z <= 0] = 0
+    dZ[Z > 0] = 1
 
     assert dZ.shape == Z.shape
 
@@ -55,10 +60,6 @@ def sigmoid_backward(dA, cache):
     assert dZ.shape == Z.shape
 
     return dZ
-
-
-def softmax(y):
-    return np.exp(y) / np.sum(np.exp(y), axis=0)
 
 def encode_one_hot(targets, num_classes):
     """
@@ -143,9 +144,7 @@ def one_layer_activation(W, b, act_prev, activation_type):
         activation, act_cache = sigmoid_activation(Z)
     if activation_type == 'softmax':
         activation, act_cache = softmax_activation(Z)
-        print('W' + str(W[0:4]))
-        print('b' + str(b[0:4]))
-        print('act_prev' + str(act_prev[0:4]))
+
 
     return activation, (lin_cache, act_cache)
 
@@ -158,7 +157,7 @@ def forward_propagation(X_train, parameters):
         A, cache = one_layer_activation(parameters["W"+str(l)], parameters["b"+str(l)], act_prev, "relu")
         caches.append(cache)
         act_prev = A
-    
+
     A_final, cache = one_layer_activation(parameters["W"+str(num_layers)], parameters["b"+str(num_layers)], act_prev, "softmax")
     caches.append(cache)
     assert A_final.shape == (10, X_train.shape[1])
@@ -181,6 +180,7 @@ def one_layer_backward(dZ, cache):
     m = act_prev.shape[1]
 
     dW = (1/m) * np.dot(dZ, act_prev.T)
+    
     db = (1/m) * np.sum(dZ, keepdims=True, axis=1)
     dA_prev = np.dot(W.T, dZ)
 
@@ -211,10 +211,11 @@ def backward_propagation(A_final, Y_train, caches):
     m = A_final.shape[1]
     Y_train = Y_train.reshape(A_final.shape)
 
-    dA_final = - np.divide(Y_train, A_final)
+    dZ_final = A_final - Y_train
+
 
     current_cache = caches[num_layers - 1]
-    a, b, c = activation_backward(dA_final, current_cache, 'softmax')
+    a, b, c = one_layer_backward(dZ_final, current_cache[0])
     gradients["dW"+str(num_layers)] = a
     gradients["db"+str(num_layers)] = b
     gradients["dA"+str(num_layers)] = c
@@ -230,7 +231,7 @@ def backward_propagation(A_final, Y_train, caches):
     return gradients
 
 
-def update_parameters(parameters, gradients, learning_rate=0.05):
+def update_parameters(parameters, gradients, learning_rate=0.1):
     num_layers = len(parameters) // 2
 
     for l in range(num_layers):
